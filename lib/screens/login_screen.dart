@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:rive/rive.dart';
 
+import 'dart:async';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -18,10 +20,34 @@ class _LoginScreenState extends State<LoginScreen> {
 
   SMIBool? _isChecking;
   SMIBool? _isHandsUp;
+  //2.1 Variables para el seguimiento de los ojos
   SMINumber? _numLook;
   SMITrigger? _trigSuccess;
   SMITrigger? _trigFail;
 
+// 1.1. crear variables para FocusNode
+  final _emailFocusNode = FocusNode();
+  final _passwordFocusNode = FocusNode();
+
+  Timer? _typingDebounce;
+
+  @override
+  void initState(){
+    super.initState();
+    _emailFocusNode.addListener((){
+      if (_emailFocusNode.hasFocus){
+        if (_isHandsUp != null){
+          //manos abajo
+          _isHandsUp?.change(false);
+          _numLook?.value = 50.0;
+        }
+      }
+    });
+    _passwordFocusNode.addListener((){
+      _isHandsUp?.change(_passwordFocusNode.hasFocus);
+    });
+
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,12 +85,24 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 10,),
             TextField(
+                focusNode: _emailFocusNode, // 1.3. asignar el FocusNode al TextField
                 onChanged: (value){
                   if (_isHandsUp != null){
                     _isHandsUp!.change(false);
                   }
                   if (_isChecking == null) return;
-                  _isChecking!.change(true);
+                    _isChecking!.change(true);
+                  //2.4 implementar logica
+                  //Ajustes son del 0 al 100. 80 medida de calibracion
+                  // Clamp es un rango (abrazadera)
+                  final double look = (value.length / 80.0 * 100.0).clamp(0, 100);
+                  _numLook?.value = look;
+                  _typingDebounce?.cancel();
+                  _typingDebounce = Timer(const Duration(seconds: 3), (){
+                    //si se cierra la pantalla, quita el contador 
+                    if (!mounted) return;
+                    _isChecking?.change(false);
+                });
                 },
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
@@ -77,12 +115,13 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             const SizedBox(height: 10),
             TextField(
+              focusNode: _passwordFocusNode, // 1.4. asignar el FocusNode al TextField
               onChanged: (value) {
                   if (_isChecking != null) {
-                    _isChecking!.change(false);
+                    //_isChecking!.change(false);
                   }
                   if (_isHandsUp == null) return;
-                  _isHandsUp!.change(true);
+                  //_isHandsUp!.change(true);
                 },
               obscureText: _obscureText,
               decoration: InputDecoration(
@@ -104,6 +143,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
+            SizedBox(height: 10),
           
             
 
@@ -116,4 +156,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
         
   }
+  //liberar memorias al salir de la pantalla
+  @override
+  void dispose() {
+    _emailFocusNode.dispose();
+    _passwordFocusNode.dispose();
+    super.dispose();
+  }
 }
+
+  
